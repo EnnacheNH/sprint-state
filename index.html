@@ -47,6 +47,16 @@
 
         </div>
     </div>
+
+    <div class="container mt-4">
+        <div class="input-group mb-3">
+            <div class="input-group-prepend">
+                <button class="btn btn-secondary" onclick="search()" type="button">Rechercher</button>
+            </div>
+            <input id="searchInputId" type="text" class="form-control" placeholder="N° US" onkeydown="onEnter(event, search)">
+        </div>
+    </div>
+
     <div class="container mt-4">
         <h2>C30 / X30</h2>
         <table class="table table-hover table-bordered">
@@ -81,11 +91,12 @@
     </div>
 
     <div class="toast-container position-fixed top-0 end-0 p-3">
-        <div id="toastId" class="toast align-items-center" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="2000">
+        <div id="toastId" class="toast align-items-center" role="alert" aria-live="assertive" aria-atomic="true"
+            data-bs-delay="2000">
             <div class="d-flex">
                 <div class="toast-body">
                     Copié !
-               </div>
+                </div>
                 <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
         </div>
@@ -130,6 +141,8 @@
     }
   }
 }`;
+    let gitlabEdges = [];
+
     document.getElementById('input-request').innerHTML = queryGitlab;
 
     const toastTrigger = document.getElementById('toastBtnId')
@@ -141,58 +154,67 @@
         })
     }
 
+    const onEnter = (event, callback) => {
+        if (event.keyCode === 13) {
+            callback();
+        }
+    }
+
     const copyToClipboard = () => {
         navigator.clipboard.writeText(queryGitlab);
     }
 
-
-
     const extract = () => {
         try {
-            document.getElementById('tbody-cx-id').innerHTML = '';
-            document.getElementById('tbody-fm-id').innerHTML = '';
-
             const response = JSON.parse(document.getElementById('input-graphql').value);
-            response.data.projects.edges.forEach((project) => {
-                const {
-                    name,
-                    issues
-                } = project.node;
-                const projectName = name.replace('CCV - ', '');
-                let tdId = '';
-                if (['C30', 'X30'].includes(projectName)) {
-                    tdId = 'tbody-cx-id';
-                }
-                if (['FCC', 'MCC'].includes(projectName)) {
-                    tdId = 'tbody-fm-id';
-                }
-                issues.edges.forEach((issue) => {
-                    const {
-                        iid,
-                        timeEstimate,
-                        totalTimeSpent,
-                        labels
-                    } = issue.node;
-                    console.log(labels.nodes);
-
-                    const labelNode = labels.nodes.find((label) => {
-                        console.log("IM IN");
-                        console.log(label);
-
-                        return ["Evolution::A chiffrer",
-                            "Evolution::A valider", "Prête",
-                            "A faire", "En cours", "Pause", "Revue", "Test interne",
-                            "Test client", "Test client OK"
-                        ].includes(label.title)
-                    });
-                    addResultRow(tdId, projectName, iid, timeEstimate, totalTimeSpent, labelNode ?
-                        labelNode.title : 'Non trouvé');
-                });
-            });
+            gitlabEdges = response.data.projects.edges;
+            updateTables();
         } catch (error) {
             alert("Echec de l'extraction :( #triste");
             console.error(error);
         }
+    }
+
+    const search = () => {
+        updateTables(document.getElementById('searchInputId').value);
+    }
+
+    const updateTables = (usNumber) => {
+        document.getElementById('tbody-cx-id').innerHTML = '';
+        document.getElementById('tbody-fm-id').innerHTML = '';
+        gitlabEdges.forEach((project) => {
+            const {
+                name,
+                issues
+            } = project.node;
+            const projectName = name.replace('CCV - ', '');
+            let tdId = '';
+            if (['C30', 'X30'].includes(projectName)) {
+                tdId = 'tbody-cx-id';
+            }
+            if (['FCC', 'MCC'].includes(projectName)) {
+                tdId = 'tbody-fm-id';
+            }
+            issues.edges.forEach((issue) => {
+                const {
+                    iid,
+                    timeEstimate,
+                    totalTimeSpent,
+                    labels
+                } = issue.node;
+                if (usNumber && iid != usNumber) {
+                    return;
+                }
+
+                const labelNode = labels.nodes.find((label) => ["Evolution::A chiffrer",
+                    "Evolution::A valider", "Prête",
+                    "A faire", "En cours", "Pause", "Revue", "Test interne",
+                    "Test client", "Test client OK"
+                ].includes(label.title));
+                addResultRow(tdId, projectName, iid, timeEstimate, totalTimeSpent, labelNode ?
+                    labelNode.title : 'Non trouvé');
+            });
+        });
     }
 
     const addResultRow = (elementId, projectName, usNumber, timeEstimate, totalTimeSpent, label) => {
